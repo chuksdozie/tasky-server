@@ -1,22 +1,16 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
-const validate = require('../../middlewares/validate');
-const userValidation = require('../../validations/user.validation');
-const userController = require('../../controllers/user.controller');
+const taskboardController = require('../../controllers/taskboard.controller');
 
 const router = express.Router();
 
-router
-  .route('/')
-  .post(auth, validate(userValidation.createUser), userController.createUser)
-  .get(auth, validate(userValidation.getUsers), userController.getUsers);
-router.route('/test').get(userController.testEndUsers);
-
-router
-  .route('/:userId')
-  .get(auth, validate(userValidation.getUser), userController.getUser)
-  .patch(auth, validate(userValidation.updateUser), userController.updateUser)
-  .delete(auth, validate(userValidation.deleteUser), userController.deleteUser);
+router.route('/create').post(auth, taskboardController.createTaskboard);
+router.route('/update').post(auth, taskboardController.updateTaskboard);
+router.route('/all').get(auth, taskboardController.getTaskboards);
+router.route('/delete').post(auth, taskboardController.removeTaskboard);
+router.route('/:id').get(auth, taskboardController.getTaskboardById);
+router.route('/board/create').post(auth, taskboardController.createBoard);
+router.route('/task/create').post(auth, taskboardController.createTask);
 
 module.exports = router;
 

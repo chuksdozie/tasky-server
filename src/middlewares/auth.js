@@ -1,33 +1,52 @@
-const passport = require('passport');
-const httpStatus = require('http-status');
+const { decrypt } = require('../services/jwt.service');
+const { getUserById } = require('../services/user.service');
 const ApiError = require('../utils/ApiError');
-const { roleRights } = require('../config/roles');
 
-const verifyCallback = (req, resolve, reject, requiredRights) => async (err, user, info) => {
-  if (err || info || !user) {
-    return reject(new ApiError(httpStatus.UNAUTHORIZED, 'Please authenticate'));
-  }
-  req.user = user;
-
-  if (requiredRights.length) {
-    const userRights = roleRights.get(user.role);
-    const hasRequiredRights = requiredRights.every((requiredRight) => userRights.includes(requiredRight));
-    if (!hasRequiredRights && req.params.userId !== user.id) {
-      return reject(new ApiError(httpStatus.FORBIDDEN, 'Forbidden'));
+const auth = async (req, res, next) => {
+  try {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
     }
+    console.log('req.headers.authorization', req.headers.authorization);
+    if (!token) {
+      return next(new ApiError('You are not logged in! Please log in to get access.', 401));
+    }
+    // console.log(token, process.env.JWT_SECRET)
+
+    const decoded = decrypt({ token });
+
+    // return organizationMemberTable and userProfile Table
+    // let org;
+    let currentUser;
+    if (decoded.sub) {
+      // currentUser = await UserProfile.findById(decoded.userId);
+      currentUser = await getUserById(decoded.sub);
+    }
+    console.log({ token, decoded });
+    if (!currentUser) {
+      return next(new ApiError('The user belonging to this token no longer exist.', 401));
+      // return next(throw  Error('The user belonging to this token no longer exist.', 401));
+    }
+
+    // 4) Check if user changed password after the token was issued
+    // if (currentUser.changedPasswordAfter(decoded.iat)) {
+    //     return next(
+    //         new AppError(
+    //             'User recently changed password! Please log in again.',
+    //             401
+    //         )
+    //     )
+    // }
+
+    // GRANT ACCESS TO PROTECTED ROUTE
+    req.user = { ...currentUser._doc };
+
+    next();
+  } catch (error) {
+    console.log(error);
+    return next(new ApiError(`${error}`, 400));
   }
-
-  resolve();
 };
-
-const auth =
-  (...requiredRights) =>
-  async (req, res, next) => {
-    return new Promise((resolve, reject) => {
-      passport.authenticate('jwt', { session: false }, verifyCallback(req, resolve, reject, requiredRights))(req, res, next);
-    })
-      .then(() => next())
-      .catch((err) => next(err));
-  };
 
 module.exports = auth;
